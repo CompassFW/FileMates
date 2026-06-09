@@ -1,0 +1,19 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": false,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "tools/fetch-attachments.py"
+        },
+        {
+          "type": "generic",
+          "path": "tools/reminder-helper.py"
+        }
+      ]
+    }
+  }
+}

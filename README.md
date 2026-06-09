@@ -337,6 +337,13 @@ The tests prove the load-bearing safety rules: a filing failure never trashes ma
 the protected list always wins, deletion is only ever reversible, and an unscoped
 `EXPUNGE` can never fire without `--force-expunge`.
 
+**Versioning:** [SemVer](https://semver.org/) (0.x = interfaces may still change), automated
+via [release-please](https://github.com/googleapis/release-please) from
+[Conventional Commits](https://www.conventionalcommits.org/) (`feat:`/`fix:`/`docs:`/…) —
+each release gets a tag, a GitHub Release and a [CHANGELOG.md](CHANGELOG.md) entry. Both
+tools report their version via `--version`. "Breaking" for FileMates means: a config key or
+CLI flag changes incompatibly.
+
 ## Privacy & disclaimer
 
 - This skill processes your email **locally** through Claude Code and your own MCP

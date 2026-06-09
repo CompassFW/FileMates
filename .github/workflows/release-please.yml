@@ -1,0 +1,20 @@
+name: release-please
+
+# Versioning automation (SemVer): reads Conventional Commits on main, maintains a
+# running Release PR (version bump + CHANGELOG.md + VERSION + in-tool __version__);
+# merging that PR creates the git tag + GitHub Release. Config:
+# release-please-config.json + .release-please-manifest.json.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4

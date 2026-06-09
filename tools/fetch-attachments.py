@@ -65,6 +65,8 @@ DEFAULT_PROTECTED_FOLDER = "_Passwortgeschuetzt"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
+__version__ = "0.1.0"  # x-release-please-version
+
 TOOLS_DIR = Path(__file__).resolve().parent
 
 
@@ -917,6 +919,7 @@ def main() -> int:
     # that matches only the spelled-out flag. Destructive flags must be typed in full.
     ap = argparse.ArgumentParser(description="Download + file mail attachments via IMAP.",
                                  allow_abbrev=False)
+    ap.add_argument("--version", action="version", version=f"FileMates fetch-attachments {__version__}")
     ap.add_argument("--from", dest="sender", help="filter by sender address")
     ap.add_argument("--subject", help="filter by subject text")
     ap.add_argument("--since", help="only mail on/after this date (YYYY-MM-DD)")

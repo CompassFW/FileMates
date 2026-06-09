@@ -52,6 +52,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+__version__ = "0.1.0"  # x-release-please-version
+
 # The link anchor written into a reminder's notes. The real Gmail-API message id is lowercase
 # hex (of X-GM-MSGID), but the token charset is the wider alphanumeric run so the anchor stays
 # robust to any id shape the connector hands back; it must NOT contain whitespace/punctuation
@@ -812,6 +814,7 @@ def cmd_record_run(args) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="FileMates reminder-helper — Apple Reminders ↔ mail.",
                                  allow_abbrev=False)   # destructive-adjacent CLI: full flags only
+    ap.add_argument("--version", action="version", version=f"FileMates reminder-helper {__version__}")
     ap.add_argument("--list", default=DEFAULT_LIST, help=f"dedicated list (default: {DEFAULT_LIST})")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
