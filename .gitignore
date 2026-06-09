@@ -1,0 +1,38 @@
+# Never commit personal config, credentials, or downloaded data
+config.local.md
+*.local.md
+**/config.local.md
+**/*.local.md
+.env
+*.env
+*.local.json
+**/*.local.json
+oauth-token.local.json
+# crash leftover of the atomic state write (tmp + os.replace)
+*.local.json.tmp
+**/*.local.json.tmp
+
+# Downloaded attachments / scratch
+downloads/
+*.pdf
+*.docx
+*.xlsx
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Python cruft
+__pycache__/
+*.pyc
+
+# compiled Apple Vision OCR helper (built by install.sh from macos-ocr.swift)
+tools/macos-ocr
+
+# internal QA / strategy artifacts — never published (council reports reference internal positioning)
+concilium/
+
+# internal /agileteam working docs — kept local, never published
+.internal/
