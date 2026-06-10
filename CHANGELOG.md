@@ -5,6 +5,13 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.2.0](https://github.com/CompassFW/FileMates/compare/v0.1.0...v0.2.0) (2026-06-10)
+
+
+### Features
+
+* waiting list for long-running cases (skip instead of re-asking) ([8cebc62](https://github.com/CompassFW/FileMates/commit/8cebc62a7899c64cb1e81c21b73cc4139141a869))
+
 ## 0.1.0 (2026-06-09)
 
 Initial public release.
