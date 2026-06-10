@@ -16,5 +16,9 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # GitHub forces JS actions onto Node 24 from 2026-06-16; opt in early so the
+    # switch is verified on our runs instead of surprising us at the deadline.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: googleapis/release-please-action@v4
