@@ -194,6 +194,28 @@ is overdue & unfulfilled → run the full flow; exit `0`/`NOOP` = nothing due �
 window (a slot crossed longer ago is not run pre-dawn). This is the tested `due_slots(...)` pure
 function — the gate decides only *whether* to run, never *what* may run.
 
+**Pre-allow the run's actions, or it will hang (learned in production).** If your host gates
+tool calls behind permission prompts, an unattended run **stalls silently** on the first
+non-pre-approved action — and a stalled run also queues up the ticks behind it. Prompt-clicked
+approvals are often only session-scoped, so the same prompt returns on every run; put a
+standing allow-list in your host's settings instead. The complete surface a scheduled FileMates
+run needs (observed from real run transcripts — read-only except the two tools and the temp file):
+
+- **Run the two tools** (absolute paths): `python3 <repo>/tools/fetch-attachments.py *`,
+  `python3 <repo>/tools/reminder-helper.py *`
+- **Read**: the FileMates repo (the run reads `SKILL.md`, `config.local.md`,
+  `delete-rules.local.md` every time), your filing folders, and the candidates temp file
+- **Write**: only the candidates file, e.g. `/tmp/filemates-*`
+- **Shell**: `ls *` and `grep *` (read-only verification/lookup)
+- **Mail connector**: search/get/list-labels/label/unlabel — the reversible set only
+- **Deny** (defense-in-depth): anything matching `*--force*` (blocks `--force-expunge`)
+
+⚠️ **macOS `/tmp` trap:** `/tmp` is a symlink to `/private/tmp`, and permission checks
+typically compare the **resolved** path — an allow rule for `/tmp/filemates-*` silently never
+matches. Always add **both** forms (`/tmp/filemates-*` **and** `/private/tmp/filemates-*`).
+Known residual prompt: moving a **file** to the OS Trash (e.g. via Finder/`osascript`) is not
+on this list — deliberate, since it is rare; expect one prompt when it happens.
+
 An unattended run has **no human present to confirm**, so it obeys the unattended-run policy
 (`decide_unattended(action, mode)` in the helper — the tested source of truth):
 
