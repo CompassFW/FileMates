@@ -283,6 +283,10 @@ layer after filing:
   recoverable Trash, the downloader skips deletion instead of risking it.
 - **Propose-first:** by default the skill lists deletion candidates and waits for your OK.
   You can switch to `auto` in the delete-rules file.
+- **Waiting list for long-running cases:** when you are waiting on an external outcome that
+  won't arrive by mail (chargeback, refund, authority decision), list the case in your config's
+  *Waiting list* and runs leave its mails completely alone — no re-download, no repeated
+  queue question, just one status line per report — until **you** close the case.
 
 ## Limitations (read this)
 

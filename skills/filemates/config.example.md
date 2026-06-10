@@ -97,5 +97,22 @@ Use absolute paths. Examples — replace with your own:
 | contracts | ~/Documents/Company/Contracts/ |
 | misc | ~/Documents/Company/Misc/ |
 
+## Waiting list (long-running cases — leave their mails alone until YOU close the case)
+Some cases stay open for days or weeks while you wait for an **external** outcome that never
+arrives by mail — a chargeback you'll only see in your banking app, a refund, an authority's
+decision. Without this list every run re-classifies those mails, may re-download their
+attachments "to be safe", and asks you the same queue question again and again.
+
+While a case is listed here, matching mails are **completely left alone**: no attachment
+download, no reminder, no archive/trash, no repeated queue question. The report carries exactly
+**one** summary line per case: `waiting: <case> (since <date>, N mails in inbox)`. Newly
+arriving mails that match the case's matcher join it automatically. **Only the user closes a
+case** (in chat — "case X is done"); only then does the *On close* column apply. Unattended
+runs must NEVER edit this list themselves.
+
+| Case | Matcher (sender / subject / known IDs) | Since | On close |
+|------|----------------------------------------|-------|----------|
+| Chargeback dispute Vendor X (123 €) | from *@bank.example with subject dispute/chargeback; payment-provider receipts naming "Vendor X"; known IDs: aaa111, bbb222 | 2026-06-01 | trash all case mails (attachments are already filed — do NOT re-download) |
+
 ## Delete rules
 See `reference/delete-rules.example.md`. Copy it to `delete-rules.local.md` and edit. The protected-sender list is the most important part — put your tax advisor, lawyer, bank, authorities there so they are NEVER deleted.

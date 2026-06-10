@@ -266,7 +266,18 @@ For each FileMates-created reminder (carries a `[gmail:<id>]` tag) that the user
 **NEVER modify or delete a reminder without a `[gmail:<id>]` tag** — those are the user's own manual reminders and are strictly off-limits (the list mixes both).
 
 ## Phase 3 — Scan + classify the inbox
-Fetch `in:inbox`, read each thread (full content). Put each mail in exactly one bucket (first match wins):
+Fetch `in:inbox`, read each thread (full content).
+
+**Waiting list first — skip beats classification.** If the local config has a *Waiting list*
+section (long-running cases where the user awaits an external outcome that won't arrive by
+mail), check every mail against it **before** bucketing. A match → skip the mail entirely:
+no attachment download (not even "again, to be safe" — re-fetching a long-pending mail is how
+duplicates happen), no reminder, no archive/trash, no repeated queue question. Newly arrived
+mails that match an open case join it silently. Report exactly **one** line per case:
+`waiting: <case> (since <date>, N mails in inbox)`. Only the **user** closes a case (in chat);
+then apply its *On close* action. Never edit the waiting list in an unattended run.
+
+Put each remaining mail in exactly one bucket (first match wins):
 - **A — Answered** → cleanup (Phase 5).
 - **B — Clear junk** (newsletter/ad/marketing, no document, no action) → cleanup (Phase 5).
 - **C — Actionable** (sign/return a document, pay an invoice, confirm an appointment, deliver info, answer a real question, implicit asks) → create reminder, **mail stays in inbox**; if it has an attachment, also Phase 4.
