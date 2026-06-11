@@ -36,7 +36,9 @@ class _Runner:
 
 
 CANDS = [{
-    "who": "Müller & Söhne",                      # umlauts must survive argv -> title
+    # Umlauts survive the JSON-unescape -> title path here (in-process argv; the real
+    # OS argv byte boundary was additionally smoke-tested live via a subprocess drill).
+    "who": "Müller & Söhne",
     "what": "Vertrag prüfen",
     "why": "Frist läuft",
     "topic": "müller vertrag",
@@ -67,13 +69,19 @@ def test_create_json_inline_creates_via_full_argv_wiring(monkeypatch):
     assert due is None                       # AC-R2: no invented deadline
 
 
-def test_create_json_inline_equivalent_to_in_file(monkeypatch, tmp_path):
+def test_create_all_three_sources_are_equivalent(monkeypatch, tmp_path):
+    # --in file, --json inline AND the stdin default must produce byte-equal
+    # runner traffic (stdin is the documented interactive workflow and would
+    # otherwise be the only uncovered source).
+    payload = json.dumps(CANDS, ensure_ascii=False)
     f = tmp_path / "cands.json"
-    f.write_text(json.dumps(CANDS), encoding="utf-8")
+    f.write_text(payload, encoding="utf-8")
     _, via_file = _run_main(monkeypatch, ["--list", "T", "create", "--in", str(f)])
-    _, via_json = _run_main(
-        monkeypatch, ["--list", "T", "create", "--json", json.dumps(CANDS)])
-    assert via_file.calls == via_json.calls   # byte-equal plans + creations
+    _, via_json = _run_main(monkeypatch, ["--list", "T", "create", "--json", payload])
+    import io
+    monkeypatch.setattr(rh.sys, "stdin", io.StringIO(payload))
+    _, via_stdin = _run_main(monkeypatch, ["--list", "T", "create"])
+    assert via_file.calls == via_json.calls == via_stdin.calls
 
 
 def test_create_json_and_in_are_mutually_exclusive_exit_2(monkeypatch, tmp_path):
@@ -88,12 +96,40 @@ def test_create_json_and_in_are_mutually_exclusive_exit_2(monkeypatch, tmp_path)
     assert e.value.code == 2                  # argparse usage error, pre-action
 
 
-def test_create_json_invalid_json_fails_loud_creates_nothing(monkeypatch):
+def test_create_json_invalid_json_is_clean_usage_error_exit_2(monkeypatch, capsys):
+    # A malformed inline payload (the expected LLM quoting slip) must be a clean
+    # pre-action USAGE error: exit code 2, a message instead of a traceback, and
+    # provably nothing touched (the runner is never even consulted).
     runner = _Runner()
     monkeypatch.setattr(rh, "OsascriptRunner", lambda: runner)
-    with pytest.raises(json.JSONDecodeError):
-        rh.main(["--list", "T", "create", "--json", "[{not json"])
-    assert all(c[0] != "create_reminder" for c in runner.calls)
+    rc = rh.main(["--list", "T", "create", "--json", "[{not json"])
+    assert rc == 2
+    assert "invalid --json payload" in capsys.readouterr().err
+    assert runner.calls == []                 # pre-action: no list read, no create
+
+
+def test_create_json_non_list_payload_is_usage_error_exit_2(monkeypatch, capsys):
+    # Valid JSON that is not a LIST (e.g. a bare object) is the same usage-error
+    # class: exit 2, message, runner untouched — no AttributeError traceback.
+    runner = _Runner()
+    monkeypatch.setattr(rh, "OsascriptRunner", lambda: runner)
+    rc = rh.main(["--list", "T", "create", "--json", "{}"])
+    assert rc == 2
+    assert "expected a JSON LIST" in capsys.readouterr().err
+    assert runner.calls == []
+
+
+def test_create_subparser_rejects_abbreviated_flags(monkeypatch):
+    # allow_abbrev=False is NOT inherited by subparsers — this pins that the create
+    # subparser repeats it. `--js` must be rejected as unknown (argparse exit 2),
+    # not silently expanded to --json (this repo already had one abbreviation
+    # bypass: --force for --force-expunge).
+    def _boom():
+        raise AssertionError("OsascriptRunner constructed despite usage error")
+    monkeypatch.setattr(rh, "OsascriptRunner", _boom)
+    with pytest.raises(SystemExit) as e:
+        rh.main(["--list", "T", "create", "--js", "[]"])
+    assert e.value.code == 2
 
 
 def test_create_json_dry_run_plans_but_creates_nothing(monkeypatch):

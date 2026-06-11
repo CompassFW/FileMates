@@ -199,7 +199,7 @@ tool calls behind permission prompts, an unattended run **stalls silently** on t
 non-pre-approved action — and a stalled run also queues up the ticks behind it. Prompt-clicked
 approvals are often only session-scoped, so the same prompt returns on every run; put a
 standing allow-list in your host's settings instead. The complete surface a scheduled FileMates
-run needs (observed from real run transcripts — read-only except the two tools and the temp file):
+run needs (observed from real run transcripts — read-only except the two tools):
 
 - **Run the two tools** (absolute paths): `python3 <repo>/tools/fetch-attachments.py *`,
   `python3 <repo>/tools/reminder-helper.py *`
@@ -327,8 +327,9 @@ typical permission-prompt sources that stall an unattended session):
 ```bash
 python3 tools/reminder-helper.py --list "<REMINDERS_LIST>" create --json '[{"who":"Alex Beispiel", … }]'
 # wrap the JSON in single quotes; escape a literal ' inside as '\''. --json and --in are
-# mutually exclusive (a usage error exits 2 before anything is touched); bad JSON fails loud
-# and creates nothing.
+# mutually exclusive, and a malformed/non-list --json payload is the same usage-error class:
+# both exit 2 with a clear message BEFORE anything is touched (nothing read, nothing created),
+# so an unattended run can treat them like any argparse slip — fix the command and retry.
 ```
 
 Candidate fields: `who/what/why` (drop a part the mail doesn't support — the helper omits Nones,

@@ -739,12 +739,22 @@ def cmd_create(args, runner: OsascriptRunner) -> int:
     dedup against the live list, plan and create. Prints the plan; asks are surfaced
     (never silently created)."""
     if getattr(args, "inline_json", None) is not None:
-        raw = args.inline_json
-    elif args.infile:
-        raw = Path(args.infile).read_text(encoding="utf-8")
+        # A malformed inline payload is a USAGE error (bad argv, typically an LLM quoting
+        # slip), and it provably happens before any action — so report it cleanly with the
+        # usage exit code 2 (same class as an argparse rejection) instead of a traceback.
+        try:
+            parsed = json.loads(args.inline_json)
+        except json.JSONDecodeError as e:
+            print(f"create: invalid --json payload (nothing was created): {e}", file=sys.stderr)
+            return 2
+        if not isinstance(parsed, list):
+            print("create: invalid --json payload (nothing was created): "
+                  "expected a JSON LIST of candidate objects", file=sys.stderr)
+            return 2
     else:
-        raw = sys.stdin.read()
-    candidates = [_candidate_from_json(o) for o in json.loads(raw)]
+        raw = Path(args.infile).read_text(encoding="utf-8") if args.infile else sys.stdin.read()
+        parsed = json.loads(raw)
+    candidates = [_candidate_from_json(o) for o in parsed]
     open_keys, completed_keys = _keys_from_reminders(runner.list_reminders(args.list))
     plan = plan_creations(candidates, open_keys, completed_keys)
     if not args.dry_run:
@@ -823,8 +833,12 @@ def main(argv=None) -> int:
     ap.add_argument("--version", action="version", version=f"FileMates reminder-helper {__version__}")
     ap.add_argument("--list", default=DEFAULT_LIST, help=f"dedicated list (default: {DEFAULT_LIST})")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    # allow_abbrev is NOT inherited by subparsers (each add_parser builds a fresh
+    # ArgumentParser) — without repeating it, `--js`/`--dry` would silently work and the
+    # "full flags only" promise above would be false for every subcommand flag.
 
-    p_create = sub.add_parser("create", help="plan + create reminders from TaskCandidates (JSON)")
+    p_create = sub.add_parser("create", allow_abbrev=False,
+                              help="plan + create reminders from TaskCandidates (JSON)")
     # --in and --json are argparse-level exclusive: rejecting both BEFORE any action keeps
     # this a pure usage error (exit 2, nothing touched).
     g_create_src = p_create.add_mutually_exclusive_group()
@@ -835,19 +849,20 @@ def main(argv=None) -> int:
                                    "unattended runs may not write files)")
     p_create.add_argument("--dry-run", action="store_true", help="plan only, create nothing")
 
-    p_react = sub.add_parser("react", help="react to user check-offs (sort completed mails)")
+    p_react = sub.add_parser("react", allow_abbrev=False,
+                             help="react to user check-offs (sort completed mails)")
     p_react.add_argument("--label-map", help="JSON file mapping gmail_id -> label")
     p_react.add_argument("--mode", default="attended",
                          choices=["attended", "auto-sort", "collect", "report-only"],
                          help="unattended-run policy (default: attended = human present)")
 
-    p_check = sub.add_parser("check-catchup",
+    p_check = sub.add_parser("check-catchup", allow_abbrev=False,
                              help="catch-up gate: exit 10 if a scheduled slot is due, else 0 (NOOP)")
     p_check.add_argument("--config", help="config.local.md path (default: the skill config)")
     p_check.add_argument("--state", help="state file path (default: .filemates-last-run.local.json)")
     p_check.add_argument("--now", help="ISO timestamp override for 'now' (testing only)")
 
-    p_record = sub.add_parser("record-run",
+    p_record = sub.add_parser("record-run", allow_abbrev=False,
                               help="record a SUCCESSFUL scheduled run (call only after the flow succeeds)")
     p_record.add_argument("--at", help="ISO timestamp override (default: now)")
     p_record.add_argument("--state", help="state file path (default: .filemates-last-run.local.json)")
