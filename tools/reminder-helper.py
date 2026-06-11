@@ -735,9 +735,15 @@ def _keys_from_reminders(reminders: list):
 
 
 def cmd_create(args, runner: OsascriptRunner) -> int:
-    """Read TaskCandidates (JSON list on stdin or --in file), dedup against the live list, plan
-    and create. Prints the plan; asks are surfaced (never silently created)."""
-    raw = Path(args.infile).read_text(encoding="utf-8") if args.infile else sys.stdin.read()
+    """Read TaskCandidates (JSON list inline via --json, from an --in file, or on stdin),
+    dedup against the live list, plan and create. Prints the plan; asks are surfaced
+    (never silently created)."""
+    if getattr(args, "inline_json", None) is not None:
+        raw = args.inline_json
+    elif args.infile:
+        raw = Path(args.infile).read_text(encoding="utf-8")
+    else:
+        raw = sys.stdin.read()
     candidates = [_candidate_from_json(o) for o in json.loads(raw)]
     open_keys, completed_keys = _keys_from_reminders(runner.list_reminders(args.list))
     plan = plan_creations(candidates, open_keys, completed_keys)
@@ -819,7 +825,14 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p_create = sub.add_parser("create", help="plan + create reminders from TaskCandidates (JSON)")
-    p_create.add_argument("--in", dest="infile", help="JSON file of candidates (default: stdin)")
+    # --in and --json are argparse-level exclusive: rejecting both BEFORE any action keeps
+    # this a pure usage error (exit 2, nothing touched).
+    g_create_src = p_create.add_mutually_exclusive_group()
+    g_create_src.add_argument("--in", dest="infile", help="JSON file of candidates (default: stdin)")
+    g_create_src.add_argument("--json", dest="inline_json", metavar="JSON",
+                              help="candidates as an inline JSON list — lets a single plain "
+                                   "command carry its payload (no temp file; useful where "
+                                   "unattended runs may not write files)")
     p_create.add_argument("--dry-run", action="store_true", help="plan only, create nothing")
 
     p_react = sub.add_parser("react", help="react to user check-offs (sort completed mails)")

@@ -204,15 +204,16 @@ run needs (observed from real run transcripts — read-only except the two tools
 - **Run the two tools** (absolute paths): `python3 <repo>/tools/fetch-attachments.py *`,
   `python3 <repo>/tools/reminder-helper.py *`
 - **Read**: the FileMates repo (the run reads `SKILL.md`, `config.local.md`,
-  `delete-rules.local.md` every time), your filing folders, and the candidates temp file
-- **Write**: only the candidates file, e.g. `/tmp/filemates-*`
+  `delete-rules.local.md` every time) and your filing folders
+- **No file writes needed**: pass reminder candidates inline via `create --json '<list>'`
+  (see Phase 3) instead of a temp file — file-write permission rules proved unreliable
+  across hosts in production (e.g. macOS resolves `/tmp` to `/private/tmp` before matching,
+  so a `/tmp/...` allow rule silently never fires), and a run that *needs no Write tool at
+  all* cannot hang on one.
 - **Shell**: `ls *` and `grep *` (read-only verification/lookup)
 - **Mail connector**: search/get/list-labels/label/unlabel — the reversible set only
 - **Deny** (defense-in-depth): anything matching `*--force*` (blocks `--force-expunge`)
 
-⚠️ **macOS `/tmp` trap:** `/tmp` is a symlink to `/private/tmp`, and permission checks
-typically compare the **resolved** path — an allow rule for `/tmp/filemates-*` silently never
-matches. Always add **both** forms (`/tmp/filemates-*` **and** `/private/tmp/filemates-*`).
 Known residual prompt: moving a **file** to the OS Trash (e.g. via Finder/`osascript`) is not
 on this list — deliberate, since it is rare; expect one prompt when it happens.
 
@@ -317,6 +318,17 @@ echo '[{"who":"Alex Beispiel","what":"Büroumzug","why":"Wegen Rückerstattung U
 # add "explicit_deadline":"2026-04-30" ONLY when the mail names a date; "filed_path" iff an attachment was filed;
 # "grey_area":true for bucket D (→ "Review:" prefix). --dry-run plans without creating (it still
 # reads the live list for the dedup check; a not-yet-existing list degrades to empty, no crash).
+```
+
+**Unattended runs: pass the candidates inline instead** — `create --json '<list>'` carries the
+payload inside the one plain command, so the run needs **no temp file and no pipe** (both are
+typical permission-prompt sources that stall an unattended session):
+
+```bash
+python3 tools/reminder-helper.py --list "<REMINDERS_LIST>" create --json '[{"who":"Alex Beispiel", … }]'
+# wrap the JSON in single quotes; escape a literal ' inside as '\''. --json and --in are
+# mutually exclusive (a usage error exits 2 before anything is touched); bad JSON fails loud
+# and creates nothing.
 ```
 
 Candidate fields: `who/what/why` (drop a part the mail doesn't support — the helper omits Nones,
