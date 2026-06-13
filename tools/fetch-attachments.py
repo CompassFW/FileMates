@@ -65,7 +65,7 @@ DEFAULT_PROTECTED_FOLDER = "_Passwortgeschuetzt"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-__version__ = "0.2.0"  # x-release-please-version
+__version__ = "0.3.0"  # x-release-please-version
 
 TOOLS_DIR = Path(__file__).resolve().parent
 
