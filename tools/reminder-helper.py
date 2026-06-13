@@ -52,7 +52,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-__version__ = "0.2.0"  # x-release-please-version
+__version__ = "0.3.0"  # x-release-please-version
 
 # The link anchor written into a reminder's notes. The real Gmail-API message id is lowercase
 # hex (of X-GM-MSGID), but the token charset is the wider alphanumeric run so the anchor stays
