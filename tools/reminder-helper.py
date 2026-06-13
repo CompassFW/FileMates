@@ -663,6 +663,11 @@ def open_gmail_ids_from_reminders(reminders: list) -> set:
     for rem in reminders:
         if rem.completed:
             continue
+        # parse_token returns None for a degenerate body with 0 OR ≥2 well-formed [gmail:]
+        # tokens. Such a reminder (the tool never writes one — the id is the single mandatory
+        # last line) is also not is_filemates_reminder and contributes no open_key, so the
+        # whole tool treats it consistently as "no single identity". We deliberately do NOT
+        # count it as an open id (favouring no-false-skip over catching a degenerate body).
         gid = parse_token(rem.body)                 # exactly-one well-formed [gmail:<id>] or None
         if gid:
             ids.add(gid)

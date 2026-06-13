@@ -254,10 +254,17 @@ Completed reminders carrying a `[gmail:<id>]` are the user's check-offs → Phas
 `topic` is model-supplied: across two runs the same mail can be phrased slightly differently
 (e.g. one run adds a `06-2026` suffix), producing two keys and — historically — a duplicate. So
 the helper also dedups on the **mail id**: if a candidate's `gmail_id` already has an **open**
-reminder, it is **skipped** even when the task-key missed (the mail is already represented). This
-only consults the live, pre-run list and is never extended mid-run, so a mail with several genuine
-to-dos passed in **one** run still creates all of them (AC-R7) — only cross-run re-processing of an
-already-open mail is suppressed.
+reminder, it is **skipped** even when the task-key missed (the mail is already represented).
+
+**Exact guarantee + its deliberate edge (honest):** AC-R7 — several genuine to-dos for one mail
+created together — holds for the **first run that reminds a mail**, i.e. while that mail has **no**
+open reminder yet (the guard consults only the frozen pre-run list, so same-run siblings of a
+not-yet-open mail all create). **Once a mail has an open reminder, every further candidate for that
+same mail is skipped** — even a genuinely new, distinct task, even when delivered alongside a
+re-detected one in a later run. This is a deliberate trade-off, not an oversight: a drifted-topic
+duplicate and a real new task are indistinguishable from the *(already-open mail, new task-key)*
+signal alone, and the chosen rule is **never duplicate** over **ask** (a rare genuinely-new task on
+an already-open mail must instead be added by the user). The behaviour is pinned by a test.
 
 ## Phase 2 — React to reminders the USER checked off
 Completion is **user-driven**: the user marks a task done by **checking off** its reminder in the Email-Tasks list. **The check-off is the ONLY "done" signal.** FileMates must **never** infer completion from mail activity (it must NOT assume "the mail was answered") — the user very often finishes a task **off-channel** (a bank transfer, WhatsApp, a phone call, in person; e.g. paying a tax bill) with **no email reply at all**. No check-off → not done, regardless of what happened in the mailbox.

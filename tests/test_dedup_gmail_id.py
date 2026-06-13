@@ -52,13 +52,40 @@ def test_ac_r7_multiple_tasks_one_mail_one_run_all_create():
     assert plan["asks"] == []
 
 
-def test_completed_mail_id_does_not_block_a_new_open_task():
-    # Only OPEN gmail-ids block. A fully-completed prior mail must not silently
-    # swallow a genuinely new task (that path stays governed by task-key + R3).
+def test_open_mail_suppresses_even_a_new_sibling_in_same_run_deliberate_tradeoff():
+    # DELIBERATE EDGE (user choice = skip, pinned so it is intentional, not accidental):
+    # once a mail has an OPEN reminder, EVERY further candidate for that same mail is
+    # skipped — even a genuinely new, distinct task delivered alongside a re-detected one
+    # in a later run. A drifted-topic duplicate and a real new task are indistinguishable
+    # from the (already-open mail, new task-key) signal alone, and the chosen rule is
+    # "never duplicate" over "ask". AC-R7 applies to the FIRST run that reminds a mail
+    # (proven by test_ac_r7_multiple_tasks_one_mail_one_run_all_create).
     plan = rh.plan_creations(
-        [_cand("fresh task", "mailDone")],
-        set(), set(), open_gmail_ids=frozenset())   # completed ids are simply not in the open set
+        [_cand("re-detected task", "mailX", what="A"),
+         _cand("genuinely new task", "mailX", what="B")],
+        {rh.task_key("re-detected task")}, set(), open_gmail_ids={"mailX"})
+    assert plan["create"] == []          # both suppressed: re-detect (task-key) + new (gmail axis)
+    assert plan["asks"] == []            # silent skip, not an ask (the chosen behaviour)
+
+
+def test_completed_mail_id_is_not_an_open_id_and_does_not_block():
+    # Only OPEN gmail-ids block. A fully-completed prior mail must NOT appear in the open-id
+    # set, and a new task on a DIFFERENT mail creates normally. (Exercises a real completed
+    # reminder, not a hand-passed empty set — the previous version's name over-promised.)
+    done = _open_rem("old done task", "mailDone", completed=True)
+    ids = rh.open_gmail_ids_from_reminders([done])
+    assert ids == set()                  # completed mail id is NOT an open id
+    plan = rh.plan_creations([_cand("fresh task", "mailNew")], set(), set(), open_gmail_ids=ids)
     assert len(plan["create"]) == 1
+
+
+def test_degenerate_two_token_body_is_not_counted_as_open_id():
+    # parse_token returns None for ≥2 well-formed [gmail:] tokens (ambiguous). Such a body
+    # (the tool never writes one) is consistently treated as "no single identity" — it
+    # contributes no open id. Pins the deliberate fail-open documented on the helper.
+    rems = [rh.Reminder(name="x", body="recap [gmail:aaa111] and also [gmail:bbb222]",
+                        completed=False)]
+    assert rh.open_gmail_ids_from_reminders(rems) == set()
 
 
 def test_default_open_gmail_ids_preserves_legacy_behavior():
