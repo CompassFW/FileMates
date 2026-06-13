@@ -250,6 +250,15 @@ state must never get a second one; a previously-**completed** task re-appearing 
 **asks**, never silently re-creates (this is the fix for the "same task created ~6×" bug).
 Completed reminders carrying a `[gmail:<id>]` are the user's check-offs → Phase 2.
 
+**Second dedup axis — the stable gmail-id.** Task-level dedup keys on `task_key(topic)`, and the
+`topic` is model-supplied: across two runs the same mail can be phrased slightly differently
+(e.g. one run adds a `06-2026` suffix), producing two keys and — historically — a duplicate. So
+the helper also dedups on the **mail id**: if a candidate's `gmail_id` already has an **open**
+reminder, it is **skipped** even when the task-key missed (the mail is already represented). This
+only consults the live, pre-run list and is never extended mid-run, so a mail with several genuine
+to-dos passed in **one** run still creates all of them (AC-R7) — only cross-run re-processing of an
+already-open mail is suppressed.
+
 ## Phase 2 — React to reminders the USER checked off
 Completion is **user-driven**: the user marks a task done by **checking off** its reminder in the Email-Tasks list. **The check-off is the ONLY "done" signal.** FileMates must **never** infer completion from mail activity (it must NOT assume "the mail was answered") — the user very often finishes a task **off-channel** (a bank transfer, WhatsApp, a phone call, in person; e.g. paying a tax bill) with **no email reply at all**. No check-off → not done, regardless of what happened in the mailbox.
 

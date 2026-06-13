@@ -653,10 +653,34 @@ def react_to_checkoffs(runner: OsascriptRunner, resolver: MailResolver,
     return report
 
 
-def plan_creations(candidates: list, open_keys: set, completed_keys: set) -> dict:
+def open_gmail_ids_from_reminders(reminders: list) -> set:
+    """The set of gmail ids that already have an OPEN FileMates reminder. This is the STABLE
+    second dedup axis: unlike task_key(topic) (LLM-supplied, drifts between runs), the gmail id
+    is deterministic, so it catches a re-processed same-mail task whose topic was reworded.
+    Only OPEN reminders count — a fully-completed prior mail must not silently swallow a new task
+    (that stays governed by the task-key + repeat-of-done rule)."""
+    ids = set()
+    for rem in reminders:
+        if rem.completed:
+            continue
+        gid = parse_token(rem.body)                 # exactly-one well-formed [gmail:<id>] or None
+        if gid:
+            ids.add(gid)
+    return ids
+
+
+def plan_creations(candidates: list, open_keys: set, completed_keys: set,
+                   open_gmail_ids: set = frozenset()) -> dict:
     """AC-R2..R5, R7. Pure: for each TaskCandidate (one per task), task_key → decide_create:
       'create' → build ReminderSpec(title=build_title, notes=build_notes, due=decide_due_date)
       'ask-*'  → recorded as an ask (never silently create).
+
+    SECOND DEDUP AXIS (gmail-id): if task-key dedup says 'create' but the candidate's mail
+    already has an OPEN reminder (open_gmail_ids, the frozen PRE-RUN snapshot), skip it silently
+    — this is a re-processed same mail whose LLM topic merely drifted (real bug 2026-06-11), never
+    a genuine new task worth a duplicate. open_gmail_ids is the live list only and is NEVER
+    extended within the loop, so AC-R7 (several tasks for one mail in ONE run) is preserved: those
+    candidates share a gmail id that is NOT in the pre-run snapshot, so they all create.
     Returns {'create': [ReminderSpec, …], 'asks': [...]}.  No I/O."""
     plan: dict = {"create": [], "asks": []}
     open_set = set(open_keys)                       # local copy so newly-planned keys dedup too
@@ -670,6 +694,8 @@ def plan_creations(candidates: list, open_keys: set, completed_keys: set) -> dic
             continue
         decision = decide_create(key, open_set, completed_keys)
         if decision == "create":
+            if cand.gmail_id in open_gmail_ids:     # same mail already open under another topic
+                continue                            # → silent skip (no duplicate); NOT an ask
             spec = ReminderSpec(
                 title=build_title(cand.who, cand.what, cand.why, cand.grey_area),
                 notes=build_notes(cand.recap, cand.mail_date, cand.gmail_id,
@@ -755,8 +781,10 @@ def cmd_create(args, runner: OsascriptRunner) -> int:
         raw = Path(args.infile).read_text(encoding="utf-8") if args.infile else sys.stdin.read()
         parsed = json.loads(raw)
     candidates = [_candidate_from_json(o) for o in parsed]
-    open_keys, completed_keys = _keys_from_reminders(runner.list_reminders(args.list))
-    plan = plan_creations(candidates, open_keys, completed_keys)
+    live = runner.list_reminders(args.list)
+    open_keys, completed_keys = _keys_from_reminders(live)
+    open_gmail_ids = open_gmail_ids_from_reminders(live)
+    plan = plan_creations(candidates, open_keys, completed_keys, open_gmail_ids)
     if not args.dry_run:
         apply_creations(runner, args.list, plan["create"])
     print(f"create: {len(plan['create'])}  ask: {len(plan['asks'])}"
