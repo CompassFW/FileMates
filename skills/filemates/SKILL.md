@@ -158,6 +158,13 @@ In every other case the mail **stays in the inbox and gets a reminder**. When in
   - **Generated-AppleScript guardrails (verified the hard way):** do NOT use AppleScript reserved/abbreviation words as variable names — `at`, `st`, `in`, `id`, `date`, `name` all break the parser; use safe names (`theStatus`, `theName`, …). AppleScript has **no inline `if … then x else y` expression** — use explicit `if/else` blocks. (Common German text incl. umlauts ä/ö/ü works fine via osascript — the earlier breakages were reserved words, not non-ASCII.)
 - Download attachments → Claude-in-Chrome. Move/rename/verify files → shell (`mv`, `ls`).
 - Labels / archive / trash → Gmail MCP (`label_message` / `unlabel_message`; archive = remove `INBOX`; trash = add `TRASH`).
+- **The helper commands are synchronous — never background them, never poll for them.** Each
+  `reminder-helper.py` / `fetch-attachments.py` call runs in the foreground and returns only when
+  it is finished; the next step begins after you read its stdout. Do **not** launch them in the
+  background and do **not** write a wait/poll loop (`while`, `kill -0`, `pgrep`, `sleep`, `wait`)
+  to "wait for the tool to finish" — there is nothing to wait for, and such loops both are an
+  illusion of work *and* (with their `$(…)`/`;`/redirects) stall an unattended run on a permission
+  prompt. If you feel the urge to wait for one of these tools, that urge is the bug.
 
 ---
 
