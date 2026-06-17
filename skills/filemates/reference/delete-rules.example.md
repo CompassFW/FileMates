@@ -51,6 +51,14 @@ Newsletters, ads, marketing, spam, pure automated notices with no value and no d
 ### 2. Receipts after download + filing
 Only if ALL are true: it is a pure receipt/confirmation (no open task, no question to you); the document was **verified** filed (Phase 4) or fully contained in the saved mail text; and there is no retention obligation beyond the filed file.
 
+### 2b. Calendar invitations — trash only AFTER the event
+A mail with a calendar invite (`.ics` / `text/calendar`) or a real meeting/event invitation is
+**never turned into a to-do** (the calendar entry is what matters). While the event is still in
+the future the mail stays in the inbox; once its event date (`DTSTART`, or the end date if
+multi-day) has clearly passed, it is trashed. If the date can't be determined or the event is
+still upcoming, keep the mail — never guess. The protected list always wins (a contract/authority
+mail that happens to carry a date stays).
+
 ### 2a. Delete-after-filing (senders whose mail is trashed ONCE the attachment is filed)
 For invoices that **also live in a portal / are re-downloadable** (utilities, SaaS) — once the
 attachment is verified on disk, the mail is redundant. The downloader

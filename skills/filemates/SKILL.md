@@ -306,8 +306,9 @@ Put each remaining mail in exactly one bucket (first match wins):
 - **B — Clear junk** (newsletter/ad/marketing, no document, no action) → cleanup (Phase 5).
 - **C — Actionable** (sign/return a document, pay an invoice, confirm an appointment, deliver info, answer a real question, implicit asks) → create reminder, **mail stays in inbox**; if it has an attachment, also Phase 4.
 - **D — Grey area / unsure** (insurance, authorities, tax, invoices, contracts, "your documents", or simply not clearly A/B/C) → create a reminder (title prefixed "Review:"), **mail stays in inbox**; file any attachment (Phase 4) but keep the mail.
+- **E — Calendar invitation** (carries a `.ics` / `text/calendar` part, or is a real meeting/event invite — Teams/Outlook/Google) → **never a to-do**. The calendar entry is the useful artifact, not a reminder. The mail **stays in the inbox while the event is still in the future**, then (once its event date — `DTSTART`, or the end date if multi-day — has clearly passed) it is trashed by a delete rule (Phase 5b). Date unknown or event still upcoming → keep, don't guess. This is opt-in via a delete-rules category; without it, calendar invites just fall through to C/D.
 
-> Never archive C or D. Only A and B are cleaned up.
+> Never archive C or D. Only A and B are cleaned up. A calendar invite (E) is neither reminded nor archived — it waits in the inbox and is trashed only after its event has passed.
 
 Create a reminder **only if its Gmail ID is absent from the Phase-1 read across ALL states** (open + completed + overdue) — hard dedup rule. `make new reminder` does **not** dedup by itself. An **overdue** reminder is NOT a reason to create a new one: leave the existing reminder as-is (its ID already exists) — re-creating a second to-do for an expired one is a bug.
 **Title convention — `Wer - Was - Warum`** (crisp, scannable in the Reminders list):
