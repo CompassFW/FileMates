@@ -381,6 +381,16 @@ automatic: app password (env `MAIL_APP_PASSWORD`) for personal accounts, or OAut
 for Google Workspace/business accounts where app passwords are blocked (one-time
 `--auth-setup`; see README → "OAuth setup").
 
+**📎 Multi-document mails — file one document at a time with `--attachment`.** One mail can
+carry several *different* documents that belong in *different* folders (a tax advisor's mail with
+an invoice + a tax-office protocol + a missing-receipts list is the classic case). A single
+downloader call files **all** attachments into the **one** folder of its `--type`, under the
+**one** naming scheme — so the documents collide on the same name (`_v1`/`_v2`) in the wrong
+place. Instead: read the mail's attachment list first, then call the downloader **once per
+document** with `--attachment "<part of the original filename>"` (case-insensitive substring) plus
+that document's own `--type` and `--name-sender`/`--name-type`. A selective `--attachment` fetch
+**never trashes the mail** (the other documents are still in it) — cleanup stays with Phase 5b.
+
 **🗂 One naming scheme per folder — flag & learn when it doesn't fit.** The goal is that every
 file inside a folder (and its sub-folders) follows **one consistent naming convention**. A file
 keeps a raw/idiosyncratic name only when the configured scheme doesn't actually produce a clean

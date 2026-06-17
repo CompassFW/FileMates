@@ -939,6 +939,11 @@ def main() -> int:
                          "document type 'Rechnung'/'Beleg' instead of the English folder key.")
     ap.add_argument("--keep-all", action="store_true",
                     help="file every attachment, ignoring the config 'ignore_attachments' boilerplate skip-list for this run")
+    ap.add_argument("--attachment",
+                    help="file ONLY attachments whose original filename contains this substring "
+                         "(case-insensitive). Lets a multi-document mail (e.g. a tax advisor's mail "
+                         "with an invoice + a UStVA + a list) be filed one document at a time, each "
+                         "with its own --type/--name. A selective fetch never trashes the mail.")
     ap.add_argument("--date-source", choices=["mail", "abbuchung", "rechnung", "leistung"],
                     help="which date the <date>/<TT-MM-JJJJ> placeholder uses: read it FROM the PDF "
                          "(abbuchung=payment/charge, rechnung=invoice, leistung=service period) or the "
@@ -1122,6 +1127,13 @@ def main() -> int:
             if ignore_patterns and not args.keep_all and \
                     any(p in fname.lower() for p in ignore_patterns):
                 skipped.append(f"boilerplate (ignore_attachments): {fname}")
+                continue
+            if args.attachment and args.attachment.lower() not in fname.lower():
+                # selective per-document fetch: this attachment is not the one requested.
+                # Mark the mail as having an unfiled recognised doc so a selective run can
+                # NEVER auto-trash the mail (the other documents are still in it).
+                skipped.append(f"not selected (--attachment {args.attachment!r}): {fname}")
+                msg_has_unfiled = True
                 continue
 
             payload = part.get_payload(decode=True)
