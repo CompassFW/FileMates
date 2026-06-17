@@ -206,6 +206,11 @@ files them into the folder, and **verifies** them on disk.
   no recoverable Trash it **leaves the mail in place** and tells you, rather than deleting
   permanently. Permanent removal happens only with the explicit `--force-expunge`. Disable all
   trashing with `--no-trash`; preview with `--dry-run`.
+- **Idempotent — no duplicates, even if the name drifts:** re-running on the same mail never
+  piles up copies. An attachment already filed in the target folder is recognised by its
+  **content fingerprint** (a tiny `.payload-md5` sidecar), so it's skipped even when this run
+  would name it differently than last run (e.g. a payroll list relabelled by a different
+  provider). Legacy files without a sidecar still de-dup by name.
 - **Folder guardrail:** if the target folder doesn't exist, the tool **errors** instead of
   creating it — pass `--mkdir` to create it deliberately. (This prevents a typo'd path from
   spawning a junk folder.)

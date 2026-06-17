@@ -376,6 +376,32 @@ def matches_payload(existing: Path, payload_md5: str) -> bool:
     return _file_md5(existing) == payload_md5
 
 
+def find_filed_by_payload(folder: Path, payload_md5: str) -> Path | None:
+    """Any document already filed in `folder` whose recorded payload fingerprint matches,
+    REGARDLESS of its filename. This is the name-independent de-dup: a re-processed
+    attachment whose chosen name drifted between runs (e.g. a payroll list labelled by
+    different providers) is still recognised as the same document and not re-filed.
+
+    Reads only the tiny `.<name>.payload-md5` sidecars that every tool-filed document
+    carries (cheap) — never hashes whole files here. Legacy files without a sidecar are
+    handled by the name-based fallback at the call site."""
+    try:
+        sidecars = list(folder.glob(".*.payload-md5"))
+    except OSError:
+        return None
+    suffix = ".payload-md5"
+    for sc in sidecars:
+        try:
+            if sc.read_text(encoding="ascii").strip() != payload_md5:
+                continue
+        except OSError:
+            continue
+        filed = sc.with_name(sc.name[1:-len(suffix)])   # ".<name>.payload-md5" -> "<name>"
+        if filed.exists():
+            return filed
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # Optional feature: name files by a date read FROM the PDF (e.g. the payment /
 # charge date), not the mail date. Configurable via `date_source`. Text layer
@@ -1221,10 +1247,15 @@ def main() -> int:
             # byte-level de-dup: if this exact attachment is already filed (same name or a
             # previous _vN), skip re-writing — re-runs must not pile up duplicate receipts.
             payload_md5 = hashlib.md5(payload).hexdigest()
-            existing = [out, *out.parent.glob(f"{out.stem}_v*{out.suffix}")]
-            # Match on the original payload md5 (sidecar) first, then raw bytes — so a
-            # filed PDF that OCR later rewrote in place still de-dups (see S2 / sidecar).
-            dup = next((e for e in existing if matches_payload(e, payload_md5)), None)
+            # Name-INDEPENDENT first: identical bytes already filed in this folder under ANY
+            # name (the chosen name may have drifted between runs) — recognised via the
+            # payload sidecars, so a re-processed attachment never piles up a renamed duplicate.
+            dup = find_filed_by_payload(eff_target, payload_md5)
+            if dup is None:
+                # Name-based fallback for legacy files without a sidecar (same name or a
+                # previous _vN); also covers an OCR-rewritten-in-place file (see S2 / sidecar).
+                existing = [out, *out.parent.glob(f"{out.stem}_v*{out.suffix}")]
+                dup = next((e for e in existing if matches_payload(e, payload_md5)), None)
             if dup:
                 filed.append(f"already filed (identical, skipped): {fname}  ->  {dup.name}")
                 msg_filed = True
