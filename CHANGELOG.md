@@ -5,6 +5,13 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.3.1](https://github.com/CompassFW/FileMates/compare/v0.3.0...v0.3.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* name-independent de-dup so a re-processed attachment never duplicates on a renamed run ([a9edddb](https://github.com/CompassFW/FileMates/commit/a9edddb7c5268e703e2958ea4cbb82a6c2b18db5))
+
 ## [0.3.0](https://github.com/CompassFW/FileMates/compare/v0.2.0...v0.3.0) (2026-06-17)
 
 
