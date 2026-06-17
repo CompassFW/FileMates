@@ -209,6 +209,12 @@ files them into the folder, and **verifies** them on disk.
 - **Folder guardrail:** if the target folder doesn't exist, the tool **errors** instead of
   creating it — pass `--mkdir` to create it deliberately. (This prevents a typo'd path from
   spawning a junk folder.)
+- **One document at a time (`--attachment`):** when a mail carries several *different*
+  documents that belong in *different* folders (e.g. an invoice + a tax-office protocol +
+  a list), file them separately — pass `--attachment "<part of the original filename>"`
+  (case-insensitive) to file only the matching attachment, once per document, each with its
+  own `--type`/`--folder` and `--name-…`. A selective fetch is partial by design, so it
+  **never trashes the mail** — the remaining documents stay in it.
 - **Month-subfolder filing (folder placeholders):** folder paths (folder map or `--folder`)
   may carry `<YYYY>`, `<MM>` and `<MM_Monat>` (German month, e.g. `06_Juni`) — resolved **per
   attachment** from the same date the filename uses. No readable date → the attachment is

@@ -132,6 +132,39 @@ def test_create_subparser_rejects_abbreviated_flags(monkeypatch):
     assert e.value.code == 2
 
 
+def test_create_json_explicit_deadline_reaches_due_date(monkeypatch):
+    # End-to-end through the --json argv path: an explicitly NAMED deadline must flow
+    # JSON -> _candidate_from_json -> decide_due_date -> create_reminder(due_date=...).
+    # (Previously only the no-deadline case (due is None, AC-R2) was wired-tested.)
+    cands = [dict(CANDS[0], explicit_deadline="2026-07-01")]
+    rc, runner = _run_main(monkeypatch, ["--list", "T", "create", "--json", json.dumps(cands)])
+    assert rc == 0
+    created = [c for c in runner.calls if c[0] == "create_reminder"]
+    assert len(created) == 1
+    assert created[0][4] == "2026-07-01"   # the due_date argument
+
+
+def test_create_json_malformed_element_is_usage_error_exit_2(monkeypatch, capsys):
+    # A well-formed LIST whose ELEMENT is malformed (here: a non-object) is the same
+    # LLM-quoting-slip class -> clean usage error (exit 2, nothing created), not a
+    # traceback. Covers the element-shape guard, not just the list-shape guard.
+    runner = _Runner()
+    monkeypatch.setattr(rh, "OsascriptRunner", lambda: runner)
+    rc = rh.main(["--list", "T", "create", "--json", "[1, 2, 3]"])
+    assert rc == 2
+    assert "invalid candidate" in capsys.readouterr().err
+    assert all(c[0] != "create_reminder" for c in runner.calls)
+
+
+def test_create_json_element_missing_gmail_id_is_exit_2(monkeypatch, capsys):
+    runner = _Runner()
+    monkeypatch.setattr(rh, "OsascriptRunner", lambda: runner)
+    rc = rh.main(["--list", "T", "create", "--json",
+                  json.dumps([{"who": "X", "topic": "t", "recap": "r", "mail_date": "2026-06-11"}])])
+    assert rc == 2
+    assert all(c[0] != "create_reminder" for c in runner.calls)
+
+
 def test_create_json_dry_run_plans_but_creates_nothing(monkeypatch):
     rc, runner = _run_main(
         monkeypatch, ["--list", "T", "create", "--json", json.dumps(CANDS), "--dry-run"])

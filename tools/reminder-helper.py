@@ -785,7 +785,15 @@ def cmd_create(args, runner: OsascriptRunner) -> int:
     else:
         raw = Path(args.infile).read_text(encoding="utf-8") if args.infile else sys.stdin.read()
         parsed = json.loads(raw)
-    candidates = [_candidate_from_json(o) for o in parsed]
+    # The list is well-formed, but an ELEMENT may still be malformed (a non-object, a missing
+    # gmail_id, an unparseable mail_date — the same LLM-quoting-slip class). Build candidates
+    # defensively so this is a clean usage error (exit 2, nothing created) instead of a
+    # traceback — honouring the "nothing was created" promise across the whole --json surface.
+    try:
+        candidates = [_candidate_from_json(o) for o in parsed]
+    except (KeyError, ValueError, TypeError, AttributeError) as e:
+        print(f"create: invalid candidate in payload (nothing was created): {e}", file=sys.stderr)
+        return 2
     live = runner.list_reminders(args.list)
     open_keys, completed_keys = _keys_from_reminders(live)
     open_gmail_ids = open_gmail_ids_from_reminders(live)

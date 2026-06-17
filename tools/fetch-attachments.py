@@ -1109,7 +1109,12 @@ def main() -> int:
         # or verify-fail. If ANY such part exists, the mail is the only copy of an unfiled
         # document and must NEVER be auto-trashed — even if a sibling attachment filed fine.
         # (Intentionally-dropped boilerplate via ignore_attachments does NOT count.)
-        msg_has_unfiled = False
+        #
+        # A SELECTIVE fetch (--attachment) is partial BY DESIGN — it files one document and
+        # leaves the mail's other documents untouched — so the mail is never complete and must
+        # always be kept. Seed the guard True up front so the "never trashes the mail" contract
+        # holds even when the selected document is the only recognised part in the mail.
+        msg_has_unfiled = bool(args.attachment)
         for part in msg.walk():
             if part.get_content_maintype() == "multipart":
                 continue
@@ -1130,10 +1135,10 @@ def main() -> int:
                 continue
             if args.attachment and args.attachment.lower() not in fname.lower():
                 # selective per-document fetch: this attachment is not the one requested.
-                # Mark the mail as having an unfiled recognised doc so a selective run can
-                # NEVER auto-trash the mail (the other documents are still in it).
+                # (The keep-the-mail guarantee is enforced once, up front, by seeding
+                # msg_has_unfiled from args.attachment — see the loop preamble — so a
+                # selective run never auto-trashes the mail, single- or multi-document.)
                 skipped.append(f"not selected (--attachment {args.attachment!r}): {fname}")
-                msg_has_unfiled = True
                 continue
 
             payload = part.get_payload(decode=True)

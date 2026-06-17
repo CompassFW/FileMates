@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------- #
 # Second dedup axis: the STABLE gmail-id, not just the LLM-supplied task topic.
 #
-# Real production bug (Zoe, 2026-06-11): the same actionable mail produced TWO
+# Real production bug: the same actionable mail produced TWO
 # open reminders across two runs because the LLM phrased `topic` differently
-# each time ("enbw abbuchung fehlgeschlagen 06-2026" vs "...fehlgeschlagen") —
+# each time ("vendor invoice overdue 06-2026" vs "...overdue") —
 # different task_key → task-level dedup missed → duplicate. The gmail id was
 # identical and stable the whole time.
 #
@@ -20,7 +20,7 @@ import reminder_helper as rh
 
 def _cand(topic, gmail_id, what="X"):
     return rh.TaskCandidate(
-        who="EnBW", what=what, why=None, recap="r", mail_date=date(2026, 6, 11),
+        who="Vendor", what=what, why=None, recap="r", mail_date=date(2026, 6, 11),
         gmail_id=gmail_id, topic=topic)
 
 
@@ -31,12 +31,12 @@ def _open_rem(topic, gmail_id, completed=False):
 
 # --- pure layer ------------------------------------------------------------ #
 def test_same_mail_drifted_topic_is_skipped_not_created():
-    # The exact Zoe bug: mail X already open under one topic; a new run offers the
+    # The exact production bug: mail X already open under one topic; a new run offers the
     # SAME mail under a drifted topic → no task-key match → gmail guard → SKIP.
-    open_keys = {rh.task_key("enbw abbuchung fehlgeschlagen 06-2026")}
+    open_keys = {rh.task_key("vendor invoice overdue 06-2026")}
     plan = rh.plan_creations(
-        [_cand("enbw abbuchung fehlgeschlagen", "19eb7bf5b438d95c")],
-        open_keys, set(), open_gmail_ids={"19eb7bf5b438d95c"})
+        [_cand("vendor invoice overdue", "aaaa1111bbbb2222")],
+        open_keys, set(), open_gmail_ids={"aaaa1111bbbb2222"})
     assert plan["create"] == []          # no duplicate
     assert plan["asks"] == []            # skip is silent (user's choice), not an ask
 
@@ -125,13 +125,13 @@ def test_cmd_create_wiring_skips_same_mail_across_runs(monkeypatch):
     # End-to-end through argv → main → cmd_create: the live list already holds an
     # OPEN reminder for mail X (drifted topic); a new --json candidate for the same
     # mail must NOT reach create_reminder.
-    live = [_open_rem("enbw abbuchung fehlgeschlagen 06-2026", "19eb7bf5b438d95c")]
+    live = [_open_rem("vendor invoice overdue 06-2026", "aaaa1111bbbb2222")]
     runner = _Runner(live)
     monkeypatch.setattr(rh, "OsascriptRunner", lambda: runner)
     import json
     payload = json.dumps([{
-        "who": "EnBW", "what": "bezahlen", "topic": "enbw abbuchung fehlgeschlagen",
-        "recap": "r", "mail_date": "2026-06-11", "gmail_id": "19eb7bf5b438d95c",
+        "who": "Vendor", "what": "pay", "topic": "vendor invoice overdue",
+        "recap": "r", "mail_date": "2026-06-11", "gmail_id": "aaaa1111bbbb2222",
         "grey_area": False}])
     rc = rh.main(["--list", "Email-Tasks", "create", "--json", payload])
     assert rc == 0
