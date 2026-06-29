@@ -130,9 +130,29 @@ def parse_config(path: Path) -> dict:
     return cfg
 
 
+def _is_section_heading(line: str) -> bool:
+    """A delete-rules section boundary is a Markdown ATX heading ONLY — a line whose
+    first non-space character is '#' (any level: #, ##, ###). Everything else is
+    section *content*: bold sub-labels like '**Senders (never delete):**', bullets,
+    prose, blockquotes and comments. This is the load-bearing rule that stops a line
+    which merely *mentions* a section marker (e.g. a junk-sender comment reading
+    '...das ist delete-after-filing oben', or 'Unknown senders' prose that names the
+    protected list) from flipping the parser into the wrong section and pulling the
+    addresses beneath it into the live delete-after / protected set."""
+    return line.lstrip().startswith("#")
+
+
 def _senders_in_section(start_markers: tuple, allow_example_fallback: bool = True) -> set[str]:
-    """Collect e-mail addresses listed under a delete-rules section whose heading
-    contains one of `start_markers`; the section ends at the next markdown heading.
+    """Collect e-mail addresses listed under a delete-rules section whose HEADING
+    contains one of `start_markers`; the section runs until the next heading. Only an
+    ATX ('#') heading ever starts or ends a section — never a comment, sub-label or
+    prose line that happens to contain a marker word (see `_is_section_heading`). Both
+    shipped layouts (local + example) introduce every section with a '#' heading and use
+    bold lines only as in-section sub-labels, so heading-only boundaries lose nothing.
+    Setext headings (an `===`/`---` underline instead of a leading '#') are intentionally
+    NOT treated as boundaries; neither shipped file uses them, and an unrecognised
+    boundary fails safe — the parser stays in its current section rather than spuriously
+    opening a delete-after section.
 
     `allow_example_fallback`: if the local file is missing/empty, also read the shipped
     delete-rules.example.md. Safe for the PROTECTED list (extra protection can't hurt),
@@ -147,14 +167,11 @@ def _senders_in_section(start_markers: tuple, allow_example_fallback: bool = Tru
             continue
         in_section = False
         for line in path.read_text(encoding="utf-8").splitlines():
-            low = line.lower()
-            if line.lstrip().startswith("#") or low.startswith(("###", "##")):
-                in_section = any(m in low for m in start_markers)
-                continue
-            if any(m in low for m in start_markers):     # also catch bold non-# headers
-                in_section = True
+            if _is_section_heading(line):
+                in_section = any(m in line.lower() for m in start_markers)
                 continue
             if in_section:
+                low = line.lower()
                 if "[at]" in low or "(example" in low:   # skip placeholder/example lines
                     continue
                 for addr in re.findall(r"[\w.+-]+@[\w.-]+", line):

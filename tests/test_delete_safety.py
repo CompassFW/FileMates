@@ -334,3 +334,85 @@ def test_file_md5_distinguishes_content(tmp_path):
     c.write_bytes(b"world")
     assert fa._file_md5(a) == fa._file_md5(b)   # identical bytes -> identical hash
     assert fa._file_md5(a) != fa._file_md5(c)   # different bytes -> different hash
+
+
+# --------------------------------------------------------------------------- #
+# 12. Section detection is heading-bound: a comment that merely MENTIONS a
+#     section marker must never flip the parser into the wrong section.
+#     (Regression: a 'this is delete-after-filing above' note in the junk-sender
+#     section leaked its addresses into the live auto-trash set.)
+# --------------------------------------------------------------------------- #
+def test_marker_word_in_a_later_comment_does_not_leak_into_delete_after(monkeypatch, tmp_path):
+    # The Delete-after-filing section ends at the NEXT heading. A later, unrelated
+    # section that MENTIONS the literal words "delete-after-filing" on a comment line
+    # must not pull the addresses BELOW that comment into the auto-trash list. (This is
+    # exactly the real bug: the live delete-rules.local.md has two such notes in the
+    # junk-sender section reading "...das ist delete-after-filing oben", with the
+    # IHK/Minor-Hotels addresses underneath them silently becoming live delete-after-
+    # filing rules. This fixture minimises that to one marker note + one clean address
+    # below it.) Reverting the fix — letting any marker-bearing line restart the
+    # section — makes the last assert fail.
+    local = tmp_path / "delete-rules.local.md"
+    local.write_text(
+        "## DELETE ALLOWED (trash)\n"
+        "### Delete-after-filing (auto-trash once the attachment is filed)\n"
+        "- realvendor@portal.de              # utility invoices that also live in a portal\n"
+        "\n"
+        "### Sender delete-list (junk)\n"
+        "> Note: these are NOT delete-after-filing senders (their receipt lives in a portal).\n"
+        "- ads@newsletter.de                 # plain junk newsletter\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fa, "DEFAULT_DELETE_RULES", local)
+    da = fa.load_delete_after_senders()
+    assert "realvendor@portal.de" in da          # the genuine section still loads
+    assert "ads@newsletter.de" not in da         # a marker word in a preceding comment must NOT leak it in
+
+
+def test_protected_section_survives_bold_sublabel_and_does_not_bleed(monkeypatch, tmp_path):
+    # Two guarantees in one realistic layout:
+    #  (a) a real protected sender under a bold '**Senders (never delete):**' sub-label
+    #      is still loaded (the sub-label is content, not a section boundary), and
+    #  (b) a later 'Unknown senders' section whose prose mentions "protected" must NOT
+    #      bleed its address into the PROTECTED set.
+    # The (a) assert is the safety-critical one: if the fix ever dropped the section on a
+    # bold line, a protected sender would silently lose its never-delete shield. The (b)
+    # assert fails on the old code, where the prose line restarted the protected section.
+    local = tmp_path / "delete-rules.local.md"
+    local.write_text(
+        "## PROTECTED -- never deleted (overrides everything)\n"
+        "**Senders (never delete):**\n"
+        "- advisor@kanzlei.de                # tax advisor\n"
+        "\n"
+        "## Unknown senders -- never auto-delete\n"
+        "If a sender is on neither the protected list nor any rule, keep it and never delete it.\n"
+        "- stranger@unknown.io               # just a stranger\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fa, "DEFAULT_DELETE_RULES", local)
+    prot = fa.load_protected_senders()
+    assert "advisor@kanzlei.de" in prot           # survives the bold sub-label (safety-critical)
+    assert "stranger@unknown.io" not in prot       # prose mentioning a marker must NOT bleed in
+
+
+def test_bold_marker_line_is_content_not_a_heading(monkeypatch, tmp_path):
+    # The by-design invariant the other two tests only catch as a side effect: a
+    # bold-only line (e.g. '**These are protected, never deleted:**') is CONTENT, not a
+    # section boundary — even when it carries real marker words. Directly kills a
+    # plausible "make bold lines headings too" mutant of _is_section_heading: under that
+    # mutant the bold line would open a PROTECTED section and pull the junk address into
+    # the never-delete set (1st assert) while ending the delete-after section early
+    # (2nd assert). Heading-only boundaries keep both correct.
+    local = tmp_path / "delete-rules.local.md"
+    local.write_text(
+        "## DELETE ALLOWED (trash)\n"
+        "### Delete-after-filing (auto-trash once the attachment is filed)\n"
+        "- realvendor@portal.de              # genuine delete-after sender\n"
+        "**These are protected, never deleted:**\n"   # bold line carrying BOTH protected markers
+        "- ads@newsletter.de                 # a bold marker line must NOT make this protected\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fa, "DEFAULT_DELETE_RULES", local)
+    assert "ads@newsletter.de" not in fa.load_protected_senders()   # bold marker line != heading
+    assert "ads@newsletter.de" in fa.load_delete_after_senders()    # still inside the real section
+    assert "realvendor@portal.de" in fa.load_delete_after_senders()  # genuine sender unaffected
