@@ -5,6 +5,13 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.3.2](https://github.com/CompassFW/FileMates/compare/v0.3.1...v0.3.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **downloader:** only Markdown headings delimit delete-rules sections ([a58fe1a](https://github.com/CompassFW/FileMates/commit/a58fe1ab882909b7a1376546abf748603b34c34a))
+
 ## [0.3.1](https://github.com/CompassFW/FileMates/compare/v0.3.0...v0.3.1) (2026-06-17)
 
 
