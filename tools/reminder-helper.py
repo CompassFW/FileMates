@@ -42,6 +42,7 @@ NO inline `if…then…else` expression; German umlauts round-trip fine.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -723,6 +724,96 @@ def apply_creations(runner: OsascriptRunner, list_name: str, specs: list) -> Non
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Waiting-list matcher (deterministic; pure — no I/O)
+#
+# An open "waiting case" is a situation where the user waits on an EXTERNAL reply
+# that does not arrive by mail. Its mails must be left completely untouched every
+# run. The KNOWN signals — a mail's stable gmail-id and its sender — are matched
+# here deterministically, so the run never re-processes or re-asks a known case.
+# The fuzzy "does this NEW mail look like it belongs" stays with the LLM (that is
+# for proposing new cases, not for matching existing ones).
+#
+# Machine matchers live in an explicit token appended to each waiting-row in
+# config.local.md, behind the human prose:
+#     … prose … [[match ids=<hex,…> senders=<addr-or-*@domain,…> exclude=<addr,…>]]
+# `exclude` ALWAYS wins (a mail whose sender is excluded is never skipped by that
+# case) — this is the safety net that keeps e.g. a monthly vendor invoice out of a
+# same-vendor dispute case.
+# ─────────────────────────────────────────────────────────────────────────────
+_MATCH_TOKEN = re.compile(r"\[\[match\s+(.*?)\]\]")
+
+
+@dataclass(frozen=True)
+class WaitingCase:
+    vorgang: str
+    ids: frozenset
+    senders: tuple
+    excludes: tuple
+
+
+def _split_list(value: str) -> tuple:
+    return tuple(v for v in (p.strip() for p in value.split(",")) if v)
+
+
+def parse_waiting_cases(text: str) -> list:
+    """Parse waiting-list rows that carry a `[[match …]]` token. The case name is
+    the row's first table cell; the human prose before the token is ignored. A line
+    without the token is not a waiting case (so ordinary prose never matches)."""
+    cases = []
+    for raw in text.splitlines():
+        # A token inside an HTML comment (a retired / annotated case) is inert; and only
+        # a genuine table row — never prose that merely MENTIONS the token, e.g. this
+        # file's own docs — becomes a live case. Without this, an explanatory sentence
+        # would silently park real mail (the exact failure this feature prevents).
+        line = re.sub(r"<!--.*?-->", "", raw)
+        if not line.lstrip().startswith("|"):
+            continue
+        m = _MATCH_TOKEN.search(line)
+        if not m:
+            continue
+        fields = dict(re.findall(r"(\w+)=([^\s\]]+)", m.group(1)))
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        cases.append(WaitingCase(
+            vorgang=cells[0] if cells else "",
+            ids=frozenset(_split_list(fields.get("ids", ""))),
+            senders=_split_list(fields.get("senders", "")),
+            excludes=_split_list(fields.get("exclude", "")),
+        ))
+    return cases
+
+
+def _sender_addr(frm: str) -> str:
+    """Extract the bare address from a `Name <addr@host>` header (or take the whole
+    value), lowercased — so glob matching is on the address, case-insensitively."""
+    m = re.search(r"<([^>]+)>", frm)
+    return (m.group(1) if m else frm).strip().lower()
+
+
+def _sender_matches(frm: str, globs) -> bool:
+    addr = _sender_addr(frm)
+    return any(fnmatch.fnmatch(addr, g.strip().lower()) for g in globs)
+
+
+def match_waiting(mails: list, cases: list) -> list:
+    """For each mail, decide skip (belongs to a known open waiting case) vs process.
+    Order preserved. exclude wins over both id and sender matches."""
+    out = []
+    for mail in mails:
+        gid = str(mail.get("gmail_id") or "").strip()
+        frm = str(mail.get("from") or "")
+        hit = None
+        for case in cases:
+            if _sender_matches(frm, case.excludes):
+                continue                       # exclusion wins → this case can't catch it
+            if (gid and gid in case.ids) or _sender_matches(frm, case.senders):
+                hit = case
+                break
+        out.append({"gmail_id": gid, "verdict": "skip" if hit else "process",
+                    "vorgang": hit.vorgang if hit else None})
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CLI (thin; the real seams are wired here — exercised by the human smoke, not CI)
 # ─────────────────────────────────────────────────────────────────────────────
 DEFAULT_LIST = "Email-Tasks"
@@ -868,6 +959,45 @@ def cmd_record_run(args) -> int:
     return 0
 
 
+def cmd_match_waiting(args) -> int:
+    """Decide which inbox mails belong to a known OPEN waiting case (skip) vs. should
+    be processed. Reads the waiting matchers from config.local.md; the mails come inline
+    as --json (same contract/exit-2 discipline as `create --json`). ZERO mutation."""
+    try:
+        parsed = json.loads(args.inline_json)
+    except json.JSONDecodeError as e:
+        print(f"match-waiting: invalid --json payload (nothing decided): {e}", file=sys.stderr)
+        return 2
+    if not isinstance(parsed, list):
+        print("match-waiting: invalid --json payload (nothing decided): "
+              "expected a JSON LIST of mail objects", file=sys.stderr)
+        return 2
+    if not all(isinstance(o, dict) for o in parsed):
+        print("match-waiting: invalid --json payload (nothing decided): "
+              "each element must be a mail object", file=sys.stderr)
+        return 2
+    if not all(isinstance(o.get(k, ""), str) for o in parsed for k in ("gmail_id", "from")):
+        print("match-waiting: invalid --json payload (nothing decided): "
+              "'gmail_id'/'from' must be strings", file=sys.stderr)
+        return 2
+    cfg_path = Path(args.config) if args.config else DEFAULT_CONFIG
+    text = cfg_path.read_text(encoding="utf-8") if cfg_path.exists() else ""
+    cases = parse_waiting_cases(text)
+    verdicts = match_waiting(parsed, cases)
+    by_case: dict = {}
+    processed = []
+    for v in verdicts:
+        if v["verdict"] == "skip":
+            by_case.setdefault(v["vorgang"], []).append(v["gmail_id"])
+        else:
+            processed.append(v["gmail_id"])
+    print(f"waiting-cases: {len(cases)}")
+    for vorgang, ids in by_case.items():
+        print(f"WARTET: {vorgang} — {len(ids)} Mail(s): {', '.join(ids)}")
+    print(f"PROCESS: {len(processed)} Mail(s): {', '.join(processed)}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="FileMates reminder-helper — Apple Reminders ↔ mail.",
                                  allow_abbrev=False)   # destructive-adjacent CLI: full flags only
@@ -908,11 +1038,19 @@ def main(argv=None) -> int:
     p_record.add_argument("--at", help="ISO timestamp override (default: now)")
     p_record.add_argument("--state", help="state file path (default: .filemates-last-run.local.json)")
 
+    p_match = sub.add_parser("match-waiting", allow_abbrev=False,
+                             help="deterministically skip inbox mails that belong to a known open waiting case")
+    p_match.add_argument("--json", dest="inline_json", required=True, metavar="JSON",
+                         help="inbox mails as an inline JSON list: [{gmail_id, from, subject}, …]")
+    p_match.add_argument("--config", help="config.local.md path (default: the skill config)")
+
     args = ap.parse_args(argv)
     if args.cmd == "check-catchup":
         return cmd_check_catchup(args)
     if args.cmd == "record-run":
         return cmd_record_run(args)
+    if args.cmd == "match-waiting":
+        return cmd_match_waiting(args)
     if args.cmd == "create":
         return cmd_create(args, OsascriptRunner())
     if args.cmd == "react":

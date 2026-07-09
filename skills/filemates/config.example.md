@@ -110,9 +110,17 @@ arriving mails that match the case's matcher join it automatically. **Only the u
 case** (in chat — "case X is done"); only then does the *On close* column apply. Unattended
 runs must NEVER edit this list themselves.
 
+**Machine matcher (deterministic skip).** So a run does not re-read the prose every time,
+`reminder-helper.py match-waiting` reads a compact token appended to each row:
+`[[match ids=<id,…> senders=<addr or *@domain,…> exclude=<addr,…>]]`. `ids` are exact
+gmail-ids; `senders`/`exclude` are case-insensitive globs matched against the sender address.
+**`exclude` always wins** — a sender listed in `exclude` is never skipped by this case (the
+safety net that keeps e.g. a monthly vendor receipt out of a same-vendor dispute). Put the
+human prose first and the token last; a row without a token is matched by the model only.
+
 | Case | Matcher (sender / subject / known IDs) | Since | On close |
 |------|----------------------------------------|-------|----------|
-| Chargeback dispute Vendor X (123 €) | from *@bank.example with subject dispute/chargeback; payment-provider receipts naming "Vendor X"; known IDs: aaa111, bbb222 | 2026-06-01 | trash all case mails (attachments are already filed — do NOT re-download) |
+| Chargeback dispute Vendor X (123 €) | from *@bank.example with subject dispute/chargeback; payment-provider receipts naming "Vendor X"; known IDs: aaa111, bbb222 [[match ids=aaa111,bbb222 senders=*@bank.example exclude=*@payments.example]] | 2026-06-01 | trash all case mails (attachments are already filed — do NOT re-download) |
 
 ## Delete rules
 See `reference/delete-rules.example.md`. Copy it to `delete-rules.local.md` and edit. The protected-sender list is the most important part — put your tax advisor, lawyer, bank, authorities there so they are NEVER deleted.
