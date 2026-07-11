@@ -5,6 +5,14 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.4.0](https://github.com/CompassFW/FileMates/compare/v0.3.2...v0.4.0) (2026-07-11)
+
+
+### Features
+
+* **fetch-attachments:** --gmail-id selector (X-GM-MSGID) for one-mail fetch ([57c6916](https://github.com/CompassFW/FileMates/commit/57c6916877470f33963b036556faee3511f60e15))
+* **reminder-helper:** deterministic waiting-list matcher (match-waiting) ([6f75ab0](https://github.com/CompassFW/FileMates/commit/6f75ab002a2be6e3ccdf3a479438658c06020295))
+
 ## [0.3.2](https://github.com/CompassFW/FileMates/compare/v0.3.1...v0.3.2) (2026-06-29)
 
 
