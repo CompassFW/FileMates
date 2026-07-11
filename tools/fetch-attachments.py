@@ -27,6 +27,7 @@ Usage examples:
   python3 tools/fetch-attachments.py --from noreply-mobility@enbw.com \
       --folder "~/Documents/Belege 2026/01_Januar"
   python3 tools/fetch-attachments.py --message-id '<abc@mail>' --type receipts
+  python3 tools/fetch-attachments.py --gmail-id 1234567890abcdef --type receipts --dry-run
 
 Config is read from skills/filemates/config.local.md (see config.example.md).
 """
@@ -688,8 +689,27 @@ def _q(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', "") + '"'
 
 
+def _gmail_hex(value: str) -> str:
+    """argparse type for --gmail-id: accept a Gmail message id in hex (the form the
+    Gmail MCP / API hands back, e.g. `1234567890abcdef`), tolerate a `0x` prefix and any
+    case, and reject anything else as a usage error (exit 2). Returns the bare lowercase
+    hex; build_search converts it to the decimal X-GM-MSGID that Gmail IMAP searches on."""
+    v = value.strip().lower()
+    if v.startswith("0x"):
+        v = v[2:]
+    if not re.fullmatch(r"[0-9a-f]{1,16}", v):
+        raise argparse.ArgumentTypeError(
+            f"--gmail-id must be a Gmail message id in hex (1-16 hex digits); got {value!r}")
+    return v
+
+
 def build_search(args) -> list[str]:
     crit: list[str] = []
+    if getattr(args, "gmail_id", None):
+        # Gmail-only: X-GM-MSGID searches on the DECIMAL form of the 64-bit id whose hex
+        # is exactly the connector's message id. (message_id vs gmail_id are argparse-
+        # exclusive, so at most one of these two branches ever fires.)
+        crit += ["X-GM-MSGID", str(int(args.gmail_id, 16))]
     if args.message_id:
         crit += ["HEADER", "Message-ID", _q(args.message_id)]
     if args.sender:
@@ -967,7 +987,11 @@ def main() -> int:
     ap.add_argument("--subject", help="filter by subject text")
     ap.add_argument("--since", help="only mail on/after this date (YYYY-MM-DD)")
     ap.add_argument("--before", help="only mail before this date (YYYY-MM-DD)")
-    ap.add_argument("--message-id", help="fetch one specific Message-ID")
+    g_id = ap.add_mutually_exclusive_group()
+    g_id.add_argument("--message-id", help="fetch one mail by its RFC822 Message-ID header (e.g. '<abc@mail>')")
+    g_id.add_argument("--gmail-id", dest="gmail_id", type=_gmail_hex,
+                      help="fetch one mail by its Gmail message id in hex (e.g. 1234567890abcdef), "
+                           "matched via X-GM-MSGID — Gmail only. Use this with the id the Gmail MCP returns.")
     ap.add_argument("--type", help="document type -> folder via config folder map (e.g. invoices)")
     ap.add_argument("--folder", help="explicit target folder (overrides --type)")
     ap.add_argument("--mailbox", help="IMAP mailbox to search (overrides config)")
