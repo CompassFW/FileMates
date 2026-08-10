@@ -392,6 +392,15 @@ document** with `--attachment "<part of the original filename>"` (case-insensiti
 that document's own `--type` and `--name-sender`/`--name-type`. A selective `--attachment` fetch
 **never trashes the mail** (the other documents are still in it) — cleanup stays with Phase 5b.
 
+**🧾 Invoice *and* receipt in one mail — use `--name-type auto`.** Many vendors attach both the
+invoice and the paid receipt to the same mail. They belong in the *same* folder, so `--attachment`
+is overkill — but a single literal `--name-type` renders both to the *same* filename and the second
+one silently lands as `…_v1`. `--name-type auto` reads each attachment's PDF text and derives the
+document type per attachment (receipt evidence wins over the invoice number a receipt always
+quotes); undetectable documents fall back to `--type`. Any `_vN` the downloader still has to use is
+printed in a **`Name collisions`** block — treat it as an open item and give the file a real,
+speaking name; never let it pass as filed-and-done.
+
 **🗂 One naming scheme per folder — flag & learn when it doesn't fit.** The goal is that every
 file inside a folder (and its sub-folders) follows **one consistent naming convention**. A file
 keeps a raw/idiosyncratic name only when the configured scheme doesn't actually produce a clean

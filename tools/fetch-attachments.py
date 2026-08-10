@@ -616,6 +616,39 @@ def parse_doc_date(text: str, source: str, keywords: dict):
     return None, None
 
 
+# Document-type detection (`--name-type auto`). The owner's convention is
+# `Anbieter_Typ_TT-MM-JJJJ`, and vendors like Anthropic/ElevenLabs attach BOTH the invoice
+# and the paid receipt to one mail. A single per-run --name-type renders both to the same
+# name (second one silently became `_v1`), so the type is derived PER ATTACHMENT here.
+#
+# Receipt markers are checked FIRST and win: a receipt always cites the invoice it settles
+# ("Invoice number …"), so invoice evidence alone must never outrank it. Conversely a mere
+# "Bezahlt"/"paid" total on an invoice must NOT flip it — hence the markers below are the
+# specific receipt phrasings ("amount paid", "paid on", "bezahlt am"), never a bare word.
+_RECEIPT_MARKERS = (
+    r"\breceipt\b", r"\bquittung\b", r"\bzahlungsbeleg\b", r"\bzahlungsbest[äa]tigung\b",
+    r"\bamount paid\b", r"\bpaid on\b", r"\bpayment history\b",
+    r"\bbetrag bezahlt\b", r"\bbezahlt am\b", r"\bzahlungsverlauf\b",
+)
+_INVOICE_MARKERS = (
+    r"\binvoice\b", r"\brechnung\b", r"\bamount due\b", r"\bbetrag f[äa]llig\b",
+    r"\brechnungsendbetrag\b", r"\bzu zahlen\b",
+)
+
+
+def detect_doc_type(text):
+    """German document type from a PDF's text layer: 'Beleg' (receipt/proof of payment),
+    'Rechnung' (invoice), or None when the text decides neither (caller keeps its default).
+    Pure and case-insensitive; never raises on empty/None input."""
+    if not text:
+        return None
+    if any(re.search(p, text, re.IGNORECASE) for p in _RECEIPT_MARKERS):
+        return "Beleg"
+    if any(re.search(p, text, re.IGNORECASE) for p in _INVOICE_MARKERS):
+        return "Rechnung"
+    return None
+
+
 def resolve_date_keywords(cfg: dict) -> dict:
     """Defaults, with optional per-source overrides from config (`date_keywords_<source>:`)."""
     kw = {k: list(v) for k, v in DEFAULT_DATE_KEYWORDS.items()}
@@ -1003,7 +1036,10 @@ def main() -> int:
                          "invoice sent by stripe.com). Folder choice stays with --type.")
     ap.add_argument("--name-type", dest="name_type",
                     help="override the <type> placeholder for NAMING only — e.g. the German "
-                         "document type 'Rechnung'/'Beleg' instead of the English folder key.")
+                         "document type 'Rechnung'/'Beleg' instead of the English folder key. "
+                         "Use 'auto' to derive Rechnung/Beleg PER ATTACHMENT from the PDF text "
+                         "(a mail carrying invoice + receipt then yields two distinct names "
+                         "instead of one plus a '_v1'); undetectable documents keep --type.")
     ap.add_argument("--keep-all", action="store_true",
                     help="file every attachment, ignoring the config 'ignore_attachments' boilerplate skip-list for this run")
     ap.add_argument("--attachment",
@@ -1076,7 +1112,10 @@ def main() -> int:
     # Naming labels: the agent may supply the REAL vendor + document type (convention
     # `Anbieter_Typ_…`) when the From-domain is just a payment processor. NAMING only —
     # the folder still comes from --type; render_name sanitises both values.
-    kind = args.name_type if args.name_type else (args.type or "doc").lower()
+    # `--name-type auto` = derive the German type PER ATTACHMENT from the PDF text below;
+    # `kind` is then only the fallback for documents the text can't classify.
+    auto_kind = (args.name_type or "").strip().lower() == "auto"
+    kind = (args.type or "doc").lower() if (auto_kind or not args.name_type) else args.name_type
     will_trash = not args.no_trash and not args.dry_run   # auto-trash delete-after-filing senders
 
     # Guardrail (lesson from the bogus-folder incident): never silently create a new
@@ -1152,6 +1191,7 @@ def main() -> int:
         return eff, None
 
     filed, skipped, problems, trashed, quarantined, ocred = [], [], [], [], [], []
+    collisions = []          # `_vN` fallbacks — reported, never silent
     ocr_failed = []
     ocr_missing = False
     deleted_uids = []   # UIDs flagged \Deleted on non-Gmail servers (for scoped UID EXPUNGE)
@@ -1272,7 +1312,14 @@ def main() -> int:
                 msg_has_unfiled = True   # nothing written -> keep the mail
                 continue
             sender_label = args.name_sender or sender_short(from_h)
-            out = eff_target / render_name(scheme, prefix, kind, sender_label,
+            # Per-attachment type so an invoice + its receipt in ONE mail get distinct,
+            # convention-correct names instead of colliding into `…_v1`.
+            att_kind = kind
+            if auto_kind:
+                if pdf_text is None and ext == ".pdf":
+                    pdf_text = extract_pdf_text(payload)
+                att_kind = detect_doc_type(pdf_text) or kind
+            out = eff_target / render_name(scheme, prefix, att_kind, sender_label,
                                            doc_when, os.path.splitext(fname)[0], ext)
             # defense-in-depth: the name is reconstructed, but never let it escape target
             if eff_target.resolve() not in out.resolve().parents:
@@ -1308,6 +1355,11 @@ def main() -> int:
             stem.write_bytes(payload)
             if stem.exists() and stem.stat().st_size > 0:   # verify
                 filed.append(f"filed: {fname}  ->  {stem}   [Datum: {date_note}]")
+                if stem.name != out.name:
+                    collisions.append(
+                        f"{out.name} was already taken by DIFFERENT content -> filed as "
+                        f"{stem.name} (two real documents share one name — give one a "
+                        f"speaking suffix; `_vN` is a fallback, not a name)")
                 msg_filed = True
                 # Record the original payload md5 BEFORE any in-place OCR rewrite, so a
                 # later re-run de-dups on a stable fingerprint instead of the OCR'd bytes.
@@ -1399,6 +1451,8 @@ def main() -> int:
     if quarantined:
         block("Protected PDFs (encrypted -> quarantine folder, not read, mail kept)"
               + (" — preview" if args.dry_run else ""), quarantined)
+    if collisions:
+        block("Name collisions (filed safely under _vN — needs a real name)", collisions)
     block("Problems", problems)
     if trashed:
         block("Trashed (delete-after-filing)" + (" — preview" if args.dry_run else ""), trashed)
