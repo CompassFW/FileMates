@@ -5,6 +5,18 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.5.0](https://github.com/CompassFW/FileMates/compare/v0.4.0...v0.5.0) (2026-08-10)
+
+
+### Features
+
+* **downloader:** derive Rechnung/Beleg per attachment via --name-type auto ([dca6819](https://github.com/CompassFW/FileMates/commit/dca6819e107cdeff566bd9d647ca9e4efb4f4a9d))
+
+
+### Bug Fixes
+
+* **ci:** pin ruff and write the lint rule set down ([e115c70](https://github.com/CompassFW/FileMates/commit/e115c707845fac7f740ffb87ad3fd925f7e6fe0e))
+
 ## [0.4.0](https://github.com/CompassFW/FileMates/compare/v0.3.2...v0.4.0) (2026-07-11)
 
 
