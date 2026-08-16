@@ -627,7 +627,7 @@ def parse_doc_date(text: str, source: str, keywords: dict):
 # specific receipt phrasings ("amount paid", "paid on", "bezahlt am"), never a bare word.
 _RECEIPT_MARKERS = (
     r"\breceipt\b", r"\bquittung\b", r"\bzahlungsbeleg\b", r"\bzahlungsbest[äa]tigung\b",
-    r"\bamount paid\b", r"\bpaid on\b", r"\bpayment history\b",
+    r"\bamount paid\b", r"\bpayment history\b",
     r"\bbetrag bezahlt\b", r"\bbezahlt am\b", r"\bzahlungsverlauf\b",
 )
 _INVOICE_MARKERS = (
@@ -635,13 +635,47 @@ _INVOICE_MARKERS = (
     r"\brechnungsendbetrag\b", r"\bzu zahlen\b",
 )
 
+# Stage 1 — the document's own heading. It is the only place where the vendor states
+# the type unambiguously ("Invoice" / "Receipt" as the first line), so it outranks any
+# body prose. A heading is a SHORT, DIGIT-FREE line: that excludes "Invoice number
+# 7E5B5F0-0005" (a receipt always quotes the invoice it settles) and print headers like
+# "03.08.26, 09:15 Squarespace", both of which would otherwise decide the type wrongly.
+_HEADING_SCAN_LINES = 5
+_HEADING_MAX_LEN = 40
+_HEADING_RECEIPT = r"\b(receipt|quittung|zahlungsbeleg|zahlungsbest[äa]tigung)\b"
+_HEADING_INVOICE = r"\b(invoice|rechnung)\b"
+
+
+def _heading_doc_type(text):
+    """Type from the document heading, or None if the first lines carry no heading."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    for line in lines[:_HEADING_SCAN_LINES]:
+        if len(line) > _HEADING_MAX_LEN or any(ch.isdigit() for ch in line):
+            continue
+        if re.search(_HEADING_RECEIPT, line, re.IGNORECASE):
+            return "Beleg"
+        if re.search(_HEADING_INVOICE, line, re.IGNORECASE):
+            return "Rechnung"
+    return None
+
 
 def detect_doc_type(text):
     """German document type from a PDF's text layer: 'Beleg' (receipt/proof of payment),
     'Rechnung' (invoice), or None when the text decides neither (caller keeps its default).
+
+    Two stages: the heading decides when there is one; otherwise body markers do, with
+    receipt evidence winning (a receipt cites its invoice, never the other way round).
+    Body markers are deliberately specific phrasings — a bare "paid"/"bezahlt" appears on
+    settled invoices too. NOTE the phrase "paid on" is NOT a marker: ElevenLabs invoices
+    carry the footnote "Tax to be paid on reverse charge basis", which used to flip every
+    monthly invoice into a Beleg and collide it with the real receipt (fixed 2026-08-16).
+
     Pure and case-insensitive; never raises on empty/None input."""
     if not text:
         return None
+    heading = _heading_doc_type(text)
+    if heading:
+        return heading
     if any(re.search(p, text, re.IGNORECASE) for p in _RECEIPT_MARKERS):
         return "Beleg"
     if any(re.search(p, text, re.IGNORECASE) for p in _INVOICE_MARKERS):

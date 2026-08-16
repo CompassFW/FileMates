@@ -83,6 +83,83 @@ def test_empty_text_is_undecided():
     assert fa.detect_doc_type(None) is None
 
 
+# ------------------------------------------------------- heading beats body prose
+
+# Verbatim shape of a real ElevenLabs invoice (2026-08-09): the heading says Invoice,
+# but a VAT footnote at the bottom contains the phrase "paid on". Body-only detection
+# read that as a receipt, so invoice and receipt collided on one name every month.
+INVOICE_WITH_VAT_FOOTNOTE = """Invoice
+Invoice number 7E5B5F0-0005
+Date of issue August 9, 2026
+$22.00 USD due August 9, 2026
+Creator (per subscription) 1 $22.00
+Amount due $22.00 USD
+[1] Tax to be paid on reverse charge basis
+"""
+
+RECEIPT_QUOTING_ITS_INVOICE = """Receipt
+Invoice number 7E5B5F0-0005
+Receipt number 2559-4010-2236
+Date paid August 9, 2026
+Amount paid $22.00
+"""
+
+
+def test_invoice_footnote_does_not_flip_to_beleg():
+    # THE regression (2026-08-16): "Tax to be paid on reverse charge basis" is prose,
+    # not proof of payment. The Invoice heading decides.
+    assert "paid on" in INVOICE_WITH_VAT_FOOTNOTE
+    assert fa.detect_doc_type(INVOICE_WITH_VAT_FOOTNOTE) == "Rechnung"
+
+
+def test_heading_beats_the_invoice_number_a_receipt_quotes():
+    assert fa.detect_doc_type(RECEIPT_QUOTING_ITS_INVOICE) == "Beleg"
+
+
+def test_line_with_digits_is_not_a_heading():
+    # "Invoice number 7E5B5F0-0005" must never count as a heading — otherwise a receipt
+    # whose own title didn't survive text extraction would be filed as an invoice.
+    text = "Invoice number 7E5B5F0-0005\nDate paid August 9, 2026\nAmount paid $22.00\n"
+    assert fa.detect_doc_type(text) == "Beleg"
+
+
+def test_german_heading_wins_over_paid_total():
+    # Squarespace: heading "Rechnung", but the body reports it as settled.
+    text = "Rechnung\n#243463025\nBerechnet am Montag, 20. Juli 2026\nBezahlt 9,52 EUR\n"
+    assert fa.detect_doc_type(text) == "Rechnung"
+
+
+def test_heading_only_scans_the_first_lines():
+    # A heading is a heading because it stands at the TOP. A short, digit-free line
+    # "Invoice" further down (a section title, a link label) is not — it must not
+    # outrank the body evidence. Note the top of this document carries no heading, so
+    # only the scan window keeps the stray word from deciding.
+    text = ("Acme Audio Inc.\nKundin Erika Mustermann\nAbrechnung\nAmount paid $22.00\n"
+            + "\n".join(f"Zeile {i}" for i in range(20)) + "\nInvoice\n")
+    assert fa._heading_doc_type(text) is None          # nothing heading-like up top
+    assert fa.detect_doc_type(text) == "Beleg"
+
+
+def test_vat_footnote_is_no_receipt_evidence_even_without_a_heading():
+    # Second line of defence: if the heading didn't survive text extraction (scan/OCR),
+    # the body must still not read "Tax to be paid on reverse charge basis" as payment.
+    # This pins the removal of "paid on" from the body markers — the heading stage alone
+    # would hide a regression here.
+    text = ("Eleven Labs Inc. 169 Madison Avenue #2484\n"
+            "$22.00 USD due August 9, 2026\nAmount due $22.00 USD\n"
+            "[1] Tax to be paid on reverse charge basis\n")
+    assert fa._heading_doc_type(text) is None          # no heading in play
+    assert fa.detect_doc_type(text) == "Rechnung"
+
+
+def test_no_heading_falls_back_to_body_markers():
+    # EnBW: the type only appears mid-page, so stage 2 has to carry it.
+    text = ("Stadtwerke Musterstadt AG\nMusterallee 93\n12345 Musterstadt\n"
+            "Erika Mustermann\nBeispielweg 1\nIhre Ladestrom-Rechnung\n"
+            "Rechnungsendbetrag 91,43 EUR\n")
+    assert fa.detect_doc_type(text) == "Rechnung"
+
+
 # -------------------------------------------------------------------- integration
 
 
