@@ -5,6 +5,13 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.5.1](https://github.com/CompassFW/FileMates/compare/v0.5.0...v0.5.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **downloader:** let the document heading decide Rechnung vs Beleg ([98e1c08](https://github.com/CompassFW/FileMates/commit/98e1c0843e126fb50b1d5016fbadc00448c5daef))
+
 ## [0.5.0](https://github.com/CompassFW/FileMates/compare/v0.4.0...v0.5.0) (2026-08-10)
 
 
