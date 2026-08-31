@@ -33,7 +33,7 @@ import shutil
 import sys
 from pathlib import Path
 
-__version__ = "0.6.0"  # x-release-please-version
+__version__ = "0.6.1"  # x-release-please-version
 
 DEFAULT_ROOT = Path.home() / "Downloads"
 DEFAULT_TRASH = Path.home() / ".Trash"
