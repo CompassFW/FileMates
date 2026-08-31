@@ -5,6 +5,13 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.6.1](https://github.com/CompassFW/FileMates/compare/v0.6.0...v0.6.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **skill:** verify the inbox scan against the INBOX counter ([b225851](https://github.com/CompassFW/FileMates/commit/b225851715f8bc60e9e797d2438a23170bc010b8))
+
 ## [0.6.0](https://github.com/CompassFW/FileMates/compare/v0.5.1...v0.6.0) (2026-08-31)
 
 
