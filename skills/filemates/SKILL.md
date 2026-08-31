@@ -292,6 +292,23 @@ For each FileMates-created reminder (carries a `[gmail:<id>]` tag) that the user
 ## Phase 3 — Scan + classify the inbox
 Fetch `in:inbox`, read each thread (full content).
 
+**Count the inbox before you trust the listing.** A thread search is not an inbox listing,
+and it does not say so. Two ways it misleads, both observed in one real run (2026-08-31):
+
+1. **Long threads come back truncated.** The scan reported 15 messages; `list_labels` put
+   `INBOX` at 23. The 8 missing ones sat inside three long threads, and one of them was a
+   genuine task (a repair shop asking for a decision) that would have vanished silently.
+2. **Threads appear that are not in the inbox at all**, matched only through a *sent*
+   message. "In the result" means neither "is in the inbox" nor "I can see all of its
+   inbox messages".
+
+So: read `INBOX.messagesTotal` from `list_labels` and compare it against the number of
+inbox messages you actually classified. If the numbers differ, pull every thread with more
+than three listed messages via `get_thread` with `messageFormat: METADATA_ONLY` (compact,
+no HTML) and classify what was missing. The scan is complete only once the counts agree —
+report the discrepancy either way, never a clean "inbox empty" you could not verify.
+
+
 **Waiting list first — skip beats classification.** If the local config has a *Waiting list*
 section (long-running cases where the user awaits an external outcome that won't arrive by
 mail), check every mail against it **before** bucketing. A match → skip the mail entirely:
