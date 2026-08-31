@@ -5,6 +5,13 @@ All notable changes to FileMates are documented here. The format follows
 [SemVer](https://semver.org/) (0.x = early project, interfaces may still change).
 Maintained automatically by release-please from Conventional Commits.
 
+## [0.6.0](https://github.com/CompassFW/FileMates/compare/v0.5.1...v0.6.0) (2026-08-31)
+
+
+### Features
+
+* **tools:** move-files — verified moves as a tool, not as improvised shell ([b6b540f](https://github.com/CompassFW/FileMates/commit/b6b540fb5cf715e7ac20f0825ef7170576832b9e))
+
 ## [0.5.1](https://github.com/CompassFW/FileMates/compare/v0.5.0...v0.5.1) (2026-08-16)
 
 
