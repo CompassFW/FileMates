@@ -299,6 +299,35 @@ layer after filing:
   *Waiting list* and runs leave its mails completely alone — no re-download, no repeated
   queue question, just one status line per report — until **you** close the case.
 
+## Moving files that are already filed (`tools/move-files.py`)
+
+Filing is a move, and sometimes a filed document has to move again — a name turned out
+wrong, two documents collided, a folder got reorganised. Doing that with a shell `mv`
+inside a scheduled run does not work: across six of our scheduled runs, **every** raw `mv`
+stopped on a permission prompt (once for 42 hours), while tool calls never did. So the
+move is a tool:
+
+```bash
+python3 tools/move-files.py --json '[{"from":"/abs/old.pdf","to":"/abs/new.pdf"}]'
+python3 tools/move-files.py --json '[…]' --root ~/Downloads --dry-run
+```
+
+What it guarantees, in code rather than in prose:
+
+- **moves, never copies** — and verifies the result (target present, same size, source gone)
+  before reporting success
+- **never overwrites**: an existing target is a reported *skip*, not a silent clobber
+- **never deletes**: a destination inside the Trash is refused outright
+- **sources must sit inside an allowed root** (`--root`, default `~/Downloads`), with
+  symlinks resolved, so nothing can be smuggled out of it
+- **creates folders only** below an explicitly allowed parking area (`--mkdir-under`)
+- **carries the hidden `.<name>.payload-md5` sidecar along**, so the de-dup fingerprint
+  never ends up pointing at a filename that no longer exists — and refuses the move if a
+  different sidecar already sits at the target
+
+Exit codes: `0` done (skips included), `1` at least one problem, `2` malformed input — and
+on `2` nothing is moved at all, the batch is refused as a whole.
+
 ## Limitations (read this)
 
 - **macOS only** (Apple Reminders / AppleScript). Not portable to Linux/Windows as written.
@@ -344,7 +373,7 @@ The deletion path is safety-critical, so its invariants are locked down by tests
 ```bash
 python -m pip install pytest ruff
 ruff check tools/ tests/
-python -m py_compile tools/fetch-attachments.py tools/ocr-folder.py
+python -m py_compile tools/fetch-attachments.py tools/ocr-folder.py tools/move-files.py
 python -m pytest tests/ -q
 ```
 

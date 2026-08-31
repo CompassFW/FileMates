@@ -35,7 +35,7 @@ jobs:
         run: ruff check tools/ tests/
 
       - name: Byte-compile the tools
-        run: python -m py_compile tools/fetch-attachments.py tools/ocr-folder.py tools/reminder-helper.py
+        run: python -m py_compile tools/fetch-attachments.py tools/ocr-folder.py tools/reminder-helper.py tools/move-files.py
 
       - name: Check installer shell syntax
         if: runner.os != 'Windows'

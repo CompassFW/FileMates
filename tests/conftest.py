@@ -19,3 +19,4 @@ def _load(module_name: str, filename: str):
 
 fetch_attachments = _load("fetch_attachments", "fetch-attachments.py")
 reminder_helper = _load("reminder_helper", "reminder-helper.py")
+move_files = _load("move_files", "move-files.py")
