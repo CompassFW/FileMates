@@ -12,6 +12,10 @@
         {
           "type": "generic",
           "path": "tools/reminder-helper.py"
+        },
+        {
+          "type": "generic",
+          "path": "tools/move-files.py"
         }
       ]
     }
